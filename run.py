@@ -12,7 +12,7 @@ from cryptography.fernet import Fernet
 # 1. 설정 및 UI 스타일링 (CSS 수정)
 # --------------------------------------------------------------------------
 
-st.set_page_config(layout="wide", page_title="IQA Survey")
+st.set_page_config(layout="wide", page_title="EQ Survey")
 
 try:
     SECRET_KEY = st.secrets["general"]["encryption_key"]
@@ -137,7 +137,7 @@ if not state_data:
     new_uid = uuid.uuid4().hex[:6]
     initial_state = {
         "uid": new_uid,
-        "step": 0,
+        "step": -1,
         "ans": ""
     }
     # 초기 상태를 암호화하여 URL에 반영
@@ -146,7 +146,7 @@ if not state_data:
     
     # 변수 할당
     user_id = new_uid
-    current_step = 0
+    current_step = -1
     saved_answers_str = ""
 else:
     # 복호화 성공 시 변수 할당
@@ -182,6 +182,17 @@ else:
 # --------------------------------------------------------------------------
 # 4. 로직 및 렌더링
 # --------------------------------------------------------------------------
+
+def start_survey():
+    """소개 페이지 -> 설문 1번 문제로 이동"""
+    new_state = {
+        "uid": user_id,
+        "step": 0, # 0번 문제로 설정
+        "ans": ""  # 답변 초기화
+    }
+    token = encrypt_state(new_state)
+    st.query_params["q"] = token
+    st.rerun()
 
 def next_step(choice):
     """
@@ -229,7 +240,39 @@ def submit():
                 st.error(f"Save Failed: {e}")
 # --- UI 렌더링 ---
 
+
+st.markdown(f"<h3 style='text-align: center;'>Sample {current_step + 1} / {TOTAL_QUESTIONS}</h3>", unsafe_allow_html=True)
+
 st.progress(min(current_step / TOTAL_QUESTIONS, 1.0))
+
+if current_step == -1:
+    st.markdown("<br><br>", unsafe_allow_html=True) # 상단 여백
+    
+    # 중앙 정렬을 위한 컬럼 분할
+    _, col_main, _ = st.columns([1, 2, 1])
+    
+    with col_main:
+        st.markdown("""
+        <div class="intro-box">
+            <h1 style="text-align: center; color: #E694FF;">엣지 품질 평가 설문</h1>
+            <hr style="border-color: #555;">
+            <p style="font-size: 1.1em; line-height: 1.6;">
+                안녕하세요.<br>
+                본 설문은 왜곡된 엣지들이 얼마나 기준 엣지와 비슷한지 평가하기 위해 진행됩니다.<br>
+                총 <strong>37개의 문항</strong>으로 구성되어 있으며, 
+                중앙의 기준 이미지(GT)와 비교하여 더 비슷하다고 생각되는 엣지를 선택해 주시면 됩니다.
+            </p>
+            <ul style="line-height: 1.6; margin-bottom: 20px;">
+                <li>⏱ 소요 시간: 약 5분 내외</li>
+                <li>💾 데이터 처리: 응답 결과는 익명으로 연구 목적으로만 활용됩니다.</li>
+                <li>⚠️ 주의: 브라우저를 닫으면 진행 상황이 초기화될 수 있습니다.</li>
+            </ul>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # 시작 버튼
+        if st.button("설문 시작하기 (Start)", type="primary"):
+            start_survey()
 
 if current_step < TOTAL_QUESTIONS:
     pair_ids = survey_plan[current_step]
@@ -239,8 +282,6 @@ if current_step < TOTAL_QUESTIONS:
         st.stop()
 
     gt_id, dist_a_id, dist_b_id = pair_ids
-
-    st.markdown(f"<h3 style='text-align: center;'>Sample {current_step + 1} / {TOTAL_QUESTIONS}</h3>", unsafe_allow_html=True)
     
     url_gt = get_image_url(gt_id)
     url_a = get_image_url(dist_a_id)
