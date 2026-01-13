@@ -157,17 +157,26 @@ else:
 # 랜덤 시드 고정
 random.seed(user_id)
 raw_data = load_metadata()
-survey_plan = []
+
+survey_plan = []    # 실제 보여줄 이미지 페어 정보 (UI용)
+survey_indices = [] # 선택된 페어의 인덱스 번호 (저장용) - [0, 2, 1, 5, ...]
 
 if raw_data:
     for idx in range(min(len(raw_data), TOTAL_QUESTIONS)):
         pairs = raw_data[idx]
         if pairs:
-            survey_plan.append(random.choice(pairs))
+            # [수정] choice 대신 randrange를 사용하여 인덱스를 직접 추출
+            r_idx = random.randrange(len(pairs))
+            
+            # 인덱스 저장
+            survey_indices.append(r_idx)
+            # 해당 인덱스의 페어 저장
+            survey_plan.append(pairs[r_idx])
         else:
+            survey_indices.append(-1) # 데이터 없음
             survey_plan.append(None)
 else:
-    st.error("No Data.")
+    st.error("데이터 파일이 없습니다.")
     st.stop()
 
 # --------------------------------------------------------------------------
@@ -197,11 +206,16 @@ def submit():
         with st.spinner("Saving..."):
             try:
                 timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                
+                # 답변 리스트 생성
                 final_answers = list(saved_answers_str)
                 if len(final_answers) < TOTAL_QUESTIONS:
                     final_answers += [""] * (TOTAL_QUESTIONS - len(final_answers))
                 
-                row_data = [timestamp, user_id] + final_answers
+                # [수정] 저장할 데이터 구성: 
+                # 타임스탬프 + UID + 답변리스트(37개) + 랜덤인덱스리스트(37개)
+                row_data = [timestamp, user_id] + list(zip(final_answers, survey_indices))
+                
                 sheet.append_row(row_data)
                 
                 st.session_state["submitted"] = True
@@ -209,7 +223,6 @@ def submit():
                 st.balloons()
             except Exception as e:
                 st.error(f"Save Failed: {e}")
-
 # --- UI 렌더링 ---
 
 st.progress(min(current_step / TOTAL_QUESTIONS, 1.0))
