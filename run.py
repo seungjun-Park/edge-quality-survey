@@ -212,9 +212,13 @@ def submit():
                 if len(final_answers) < TOTAL_QUESTIONS:
                     final_answers += [""] * (TOTAL_QUESTIONS - len(final_answers))
                 
+                new_answers = []
+                for answer, idx in zip(final_answers, survey_indices):
+                    new_answers.append(f'{answer}_{idx}')
+
                 # [수정] 저장할 데이터 구성: 
                 # 타임스탬프 + UID + 답변리스트(37개) + 랜덤인덱스리스트(37개)
-                row_data = [timestamp, user_id] + list(zip(final_answers, survey_indices))
+                row_data = [timestamp, user_id] + new_answers
                 
                 sheet.append_row(row_data)
                 
