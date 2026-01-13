@@ -241,10 +241,6 @@ def submit():
 # --- UI 렌더링 ---
 
 
-st.markdown(f"<h3 style='text-align: center;'>Sample {current_step + 1} / {TOTAL_QUESTIONS}</h3>", unsafe_allow_html=True)
-
-st.progress(min(current_step / TOTAL_QUESTIONS, 1.0))
-
 if current_step == -1:
     st.markdown("<br><br>", unsafe_allow_html=True) # 상단 여백
     
@@ -274,7 +270,11 @@ if current_step == -1:
         if st.button("설문 시작하기 (Start)", type="primary"):
             start_survey()
 
-if current_step < TOTAL_QUESTIONS:
+elif current_step < TOTAL_QUESTIONS:
+    st.markdown(f"<h3 style='text-align: center;'>Sample {current_step + 1} / {TOTAL_QUESTIONS}</h3>", unsafe_allow_html=True)
+
+    st.progress(min(current_step / TOTAL_QUESTIONS, 1.0))
+
     pair_ids = survey_plan[current_step]
     
     if not pair_ids:
