@@ -74,8 +74,6 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-TOTAL_QUESTIONS = 37
-
 # --------------------------------------------------------------------------
 # 2. 데이터 및 연결 관리
 # --------------------------------------------------------------------------
@@ -155,30 +153,41 @@ else:
     saved_answers_str = state_data["ans"]
 
 # 랜덤 시드 고정
-random.seed(user_id)
+random.seed(user_id) # 사용자별 랜덤 고정
 raw_data = load_metadata()
 
-survey_plan = []    # 실제 보여줄 이미지 페어 정보 (UI용)
-survey_indices = [] # 선택된 페어의 인덱스 번호 (저장용) - [0, 2, 1, 5, ...]
+NUM_SAMPLES = 7 
+POOL_SIZE = len(raw_data)      # 전체 이미지 개수 (JSON 파일의 데이터 수)
+
+# 실제 데이터가 POOL_SIZE보다 작으면 조정
+actual_pool_size = len(raw_data) if raw_data else 0
+actual_samples = min(NUM_SAMPLES, actual_pool_size)
+
+survey_plan = []        # 선택된 7개의 [GT, A, B] ID 리스트
+selected_img_indices = [] # 선택된 7개의 원본 이미지 인덱스 (0~36 중 7개)
+selected_distortion_indices = [] # 선택된 7개의 왜곡 페어 인덱스
 
 if raw_data:
-    for idx in range(min(len(raw_data), TOTAL_QUESTIONS)):
-        pairs = raw_data[idx]
+    # 1. 전체 풀(0~36)에서 7개의 인덱스를 무작위 비복원 추출
+    # random.sample을 쓰면 중복 없이 7개를 뽑습니다.
+    all_indices = list(range(actual_pool_size))
+    # 시드가 고정되어 있으므로, F5를 눌러도 이 사용자는 항상 같은 7문제를 풉니다.
+    selected_img_indices = random.sample(all_indices, actual_samples)
+    
+    # 2. 뽑힌 7개 이미지에 대해 왜곡 페어(A vs B) 설정
+    for img_idx in selected_img_indices:
+        pairs = raw_data[img_idx]
         if pairs:
-            # [수정] choice 대신 randrange를 사용하여 인덱스를 직접 추출
+            # 해당 이미지의 여러 왜곡 쌍 중 하나 선택
             r_idx = random.randrange(len(pairs))
-            
-            # 인덱스 저장
-            survey_indices.append(r_idx)
-            # 해당 인덱스의 페어 저장
+            selected_distortion_indices.append(r_idx)
             survey_plan.append(pairs[r_idx])
         else:
-            survey_indices.append(-1) # 데이터 없음
+            selected_distortion_indices.append(-1)
             survey_plan.append(None)
 else:
-    st.error("데이터 파일이 없습니다.")
+    st.error("No Data.")
     st.stop()
-
 # --------------------------------------------------------------------------
 # 4. 로직 및 렌더링
 # --------------------------------------------------------------------------
@@ -220,12 +229,10 @@ def submit():
                 
                 # 답변 리스트 생성
                 final_answers = list(saved_answers_str)
-                if len(final_answers) < TOTAL_QUESTIONS:
-                    final_answers += [""] * (TOTAL_QUESTIONS - len(final_answers))
                 
                 new_answers = []
-                for answer, idx in zip(final_answers, survey_indices):
-                    new_answers.append(f'{answer}_{idx}')
+                for img_idx, distortion_idx, answer in zip(selected_img_indices, selected_distortion_indices, final_answers):
+                    new_answers.append(f'{img_idx}_{distortion_idx}_{answer}')
 
                 # [수정] 저장할 데이터 구성: 
                 # 타임스탬프 + UID + 답변리스트(37개) + 랜덤인덱스리스트(37개)
@@ -255,7 +262,7 @@ if current_step == -1:
             <p style="font-size: 1.1em; line-height: 1.6;">
                 안녕하세요.<br>
                 본 설문은 왜곡된 엣지들이 얼마나 기준 엣지와 비슷한지 평가하기 위해 진행됩니다.<br>
-                총 <strong>37개의 문항</strong>으로 구성되어 있으며, 
+                총 <strong>{NUM_SAMPLES}개의 문항</strong>으로 구성되어 있으며, 
                 중앙의 기준 이미지(GT)와 비교하여 더 비슷하다고 생각되는 엣지를 선택해 주시면 됩니다.
             </p>
             <ul style="line-height: 1.6; margin-bottom: 20px;">
@@ -270,10 +277,10 @@ if current_step == -1:
         if st.button("설문 시작하기 (Start)", type="primary"):
             start_survey()
 
-elif current_step < TOTAL_QUESTIONS:
-    st.markdown(f"<h3 style='text-align: center;'>Sample {current_step + 1} / {TOTAL_QUESTIONS}</h3>", unsafe_allow_html=True)
+elif current_step < NUM_SAMPLES:
+    st.markdown(f"<h3 style='text-align: center;'>Sample {current_step + 1} / {NUM_SAMPLES}</h3>", unsafe_allow_html=True)
 
-    st.progress(min(current_step / TOTAL_QUESTIONS, 1.0))
+    st.progress(min(current_step / NUM_SAMPLES, 1.0))
 
     pair_ids = survey_plan[current_step]
     
